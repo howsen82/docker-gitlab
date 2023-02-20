@@ -173,3 +173,9 @@ networks:
 # registry_external_url 'https://regsitry.dockerbuch.info'
 # registry['registry_http_addr'] = "0.0.0.0:5000"
 # registry_nginx['enable'] = false
+#
+# To install Mattermost (Slack like)
+# git clone https://github.com/mattermost/mattermost-docker.git
+# cd mattermost-docker
+# docker-compose build
+# docker-compose up -d
