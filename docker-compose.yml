@@ -122,11 +122,24 @@ services:
     environment:
       - RELAY_FROM=gitlab_gitlab2_1.gitlab_default
 
+  gitlab-runner:
+    image: gitlab/gitlab-runner:alpine
+    container_name: gitlab-runner
+    restart: always
+    depends_on:
+      - git
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - gitlab-runner:/etc/gitlab-runner
+    networks:
+      - web
+
 volumes:
   config:
   logs:
   data:
   pgdata:
+  gitlab-runner:
 
 networks:
   web:
