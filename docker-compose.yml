@@ -1,0 +1,162 @@
+version: '3.8'
+
+services:
+  git:
+    image: gitlab/gitlab-ce:latest
+    container_name: gitlab
+    hostname: 'localhost'
+    restart: always
+    ports:
+      - 8888:80
+      - 8889:443
+      - "2222:22"
+    environment:
+      GITLAB_ROOT_PASSWORD: StrictlySecretStrictly
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'http://localhost'
+        nginx['listen_port'] = 80
+        nginx['listen_https'] = false
+        nginx['proxy_set_headers'] = {
+          "X-Forwarded-Proto" => "https",
+          "X-Forwarded-Ssl" => "on"
+        }
+        # postgresql['enable'] = false
+        # gitlab_rails['db_host'] = 'postgresql'
+        # gitlab_rails['db_port'] = '5432'
+        # gitlab_rails['db_username'] = 'gitlab'
+        # gitlab_rails['db_password'] = 'ci5ahLiAyhlq'
+        # gitlab_rails['db_database'] = 'gitlab_prod'
+        # gitlab_rails['db_adapter'] = 'postgresql'
+        # gitlab_rails['db_encoding'] = 'utf8'
+        redis['enable'] = false
+        gitlab_rails['redis_host'] = 'redis'
+        gitlab_rails['redis_port'] = '6379'
+        gitlab_rails['gitlab_shell_ssh_port'] = 2222
+        gitlab_rails['smtp_enable'] = true
+        gitlab_rails['smtp_openssl_verify_mode'] = 'none'
+        gitlab_rails['smtp_address'] = 'exim'
+        gitlab_rails['smtp_port'] = 25
+        gitlab_rails['gitlab_email_from'] = 'gitlab@dockerbuch.info'
+        gitlab_rails['gitlab_email_reply_to'] = 'gitlab@dockerbuch.info'
+        registry_external_url 'https://registry.dockerbuch.info'
+        registry['registry_http_addr'] = "0.0.0.0:5000"
+        # gitlab_rails['registry_enabled'] = true
+        # gitlab_rails['api_url'] = 'https://registry.dockerbuch.info'
+        # registry['enable'] = true
+        registry_nginx['listen_https'] = false
+        # g-client-id: 684077971201-6dubvh1keepnoemkql2l5unb58i4o6gv.apps.googleusercontent.com
+        # g-key: W3OQaLVnHJpyltQLT03cBwUb
+        gitlab_rails['omniauth_enabled'] = true
+        gitlab_rails['omniauth_allow_single_sign_on'] = ['google_oauth2']
+        gitlab_rails['omniauth_sync_profile_from_provider'] = ['google_oauth2']
+        gitlab_rails['omniauth_block_auto_created_users'] = false
+        gitlab_rails['omniauth_auto_link_ldap_user'] = true
+        gitlab_rails['omniauth_providers'] = [
+          {
+            "name" => "google_oauth2",
+            "app_id" => "XXXXXXXXXXXX-YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY.apps.googleusercontent.com",
+            "app_secret" => "ZZZZZZZZZZZZZZZZZZZZZZZZ",
+            "args" => { "access_type" => "offline",
+              "approval_prompt" => ''
+            }
+          }
+        ]
+        mattermost_external_url 'https://mattermost.dockerbuch.info'
+        mattermost_nginx['enable'] = false
+        #mattermost_nginx['listen_https'] = false
+        #mattermost_nginx['listen_addresses'] = ['*', '[::]']
+        #mattermost_nginx['listen_port'] = 80
+        #mattermost['service_use_ssl'] = false
+        mattermost['service_address'] = "0.0.0.0"
+        mattermost['service_port'] = "8065"
+        mattermost['gitlab_auth_endpoint'] = "http://gitlab.dockerbuch.info/oauth/authorize"
+        mattermost['gitlab_token_endpoint'] = "http://gitlab.dockerbuch.info/oauth/token"
+        mattermost['gitlab_user_api_endpoint'] = "http://gitlab.dockerbuch.info/api/v4/user"
+        #mattermost['env'] = {
+        #'SSL_CERT_DIR' => "/opt/gitlab/embedded/ssl/certs/"
+        #}
+        # # mattermost['sql_driver_name'] = 'postgres'
+        # # mattermost['sql_data_source'] = "postgres://mattermost:Jaequ7AeL7zo@postgresql/mattermost?sslmode=disable&connect_timeout=10"
+        # mattermost['sql_driver_name'] = 'mysql'
+        # mattermost['sql_data_source'] = "mmuser:mostest@tcp(dockerhost:3306)/mattermost_test?charset=utf8mb4,utf8"
+    volumes:
+      - config:/etc/gitlab
+      - logs:/var/log/gitlab
+      - data:/var/opt/gitlab
+    shm_size: '256m'
+    networks:
+      - web
+      - default
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.gitlab2.rule=Host(`gitlab.dockerbuch.info`)
+      - traefik.http.routers.gitlab2.tls=true
+      - traefik.http.routers.gitlab2.tls.certresolver=lets-encrypt
+      - traefik.http.services.gitlab2.loadbalancer.server.port=80
+      - traefik.http.routers.gitlab2.service=gitlab2
+      - traefik.http.routers.reg.rule=Host(`registry.dockerbuch.info`)
+      - traefik.http.routers.reg.tls=true
+      - traefik.http.routers.reg.tls.certresolver=lets-encrypt
+      - traefik.http.routers.reg.service=gitlab2-reg
+      - traefik.http.services.gitlab2-reg.loadbalancer.server.port=5000
+      - traefik.http.routers.mm.rule=Host(`mattermost.dockerbuch.info`)
+      - traefik.http.routers.mm.tls=true
+      - traefik.http.routers.mm.tls.certresolver=lets-encrypt
+      - traefik.http.routers.mm.service=mm
+      - traefik.http.services.mm.loadbalancer.server.port=8065
+
+  redis:
+    image: redis:7
+
+  postgresql:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=gitlab
+      - POSTGRES_PASSWORD=ci5ahLiAyhlq
+      - POSTGRES_DB=gitlab_prod
+    volumes:
+      - pgdata:/var/lib/postgresql
+
+  exim:
+    build: exim/
+    environment:
+      - RELAY_FROM=gitlab_gitlab2_1.gitlab_default
+
+volumes:
+  config:
+  logs:
+  data:
+  pgdata:
+
+networks:
+  web:
+    external: true
+
+# export GITLAB_HOME=/data
+# docker-compose up -d
+#
+# Login using 'root' and password get from following command
+# docker exec -it gitlab grep 'Password:' /etc/gitlab/initial_root_password
+# 
+# Change password as the temporary password valid for 24 hours
+#
+# Backup
+# docker-compose exec gitlab gitlab-rake gitlab:backup:create
+# backup file will located at /var/opt/gitlab/backups
+
+# Restore
+# docker cp xxxx_yyyy_mm_dd_gitlab_backup.tar gitlab_gitlab_1:/var/opt/gitlab/backups
+# docker-compose exec gitlab gitlab-ctl stop puma
+# docker-compose exec gitlab gitlab-ctl stop sidekiq
+# docker-compose exec gitlab chmod -R 775 /var/opt/gitlab/backups
+# docker-compose exec gitlab gitlab-rake gitlab:backup:restore BACKUP=xxxx_yyyy_mm_dd
+# docker-compose exec gitlab gitlab-ctl start
+# docker-compose exec gitlab gitlab-rake gitlab:check SANITIZE=true
+
+# If errors insists, simply enter the following command
+# docker-compose exec gitlab chown -R registry:registry /var/opt/gitlab/gitlabrails/shared/registry/docker/
+#
+# To enable the registry in GitLab, few entries in the environment variable are sufficient
+# registry_external_url 'https://regsitry.dockerbuch.info'
+# registry['registry_http_addr'] = "0.0.0.0:5000"
+# registry_nginx['enable'] = false
