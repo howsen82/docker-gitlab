@@ -125,6 +125,8 @@ services:
   gitlab-runner:
     image: gitlab/gitlab-runner:alpine
     container_name: gitlab-runner
+    environment:
+      - TZ=Asia/Kuching
     restart: always
     depends_on:
       - git
@@ -133,6 +135,8 @@ services:
       - gitlab-runner:/etc/gitlab-runner
     networks:
       - web
+    security_opt:
+      - no-new-privileges:true
 
 volumes:
   config:
